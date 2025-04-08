@@ -27,63 +27,6 @@ class Backend:
         self.users = self.db["User"]
         self.collections = self.db["Collection"]
 
-    # Get collection
-    def get_collection(self, collection_id):
-        return self.collections.find_one({"collection_id" : collection_id})
-    
-    # Get post
-    def get_post(self, post_id):
-        return self.pins.find_one({"post_id" : post_id})
-    
-    # Get user collections
-    def get_user_collections(self, user_id):
-        return list(self.collections.find({"user_id" : user_id}))
-    
-    # Get all user's posts
-    def get_user_posts(self, user_id):
-        return list(self.pins.find({"user_id": user_id}))
-    
-    # Get all posts saved by a user
-    def get_saved_posts_by_user(self, user_id):
-        user = self.users.find_one({"user_id": user_id})
-        if not user or "saved_posts" not in user:
-            return []
-        return list(self.pins.find({"post_id": {"$in": user["saved_posts"]}}))
-    
-    # Get all posts liked by a user
-    def get_liked_posts_by_user(self, user_id):
-        user = self.users.find_one({"user_id": user_id})
-        if not user or "liked_posts" not in user:
-            return []
-        return list(self.pins.find({"post_id": {"$in": user["liked_posts"]}}))
-    
-    # Get all posts saved by a user in a specific collection
-    def get_saved_posts_in_collection(self, user_id, collection_id):
-        # Ensure collection belongs to the user
-        collection = self.collections.find_one({
-            "collection_id": collection_id,
-            "user_id": user_id
-        })
-        if not collection or "post_ids" not in collection:
-            return []
-        
-        post_ids = collection["post_ids"]
-        return list(self.pins.find({"post_id": {"$in": post_ids}}))
-    
-    # Get date of post based on MongoDB _id timestamp
-    def get_post_date(self, post_id):
-        post = self.pins.find_one({"post_id": post_id})
-        if not post:
-            return None
-        # MongoDB _id contains timestamp
-        timestamp = post["_id"].generation_time
-        # Format to: December 12, 2023
-        return timestamp.strftime("%B %d, %Y")
-
-    # Add a user
-    def add_user(self, user_data):
-        return self.users.insert_one(user_data)
-    
     # Get a user
     def get_user(self, user_id):
         user = self.users.find_one({"user_id": user_id})
@@ -94,6 +37,100 @@ class Backend:
             return user
         logging.info(f"User with ID {user_id} not found.")
         return None
+
+    # Get collection
+    def get_collection(self, collection_id):
+        collection =  self.collections.find_one({"collection_id" : collection_id})
+        if collection:
+            logging.info(f"Collection with ID {collection_id} found: {collection}")
+            del collection["_id"]
+            return collection
+        logging.info(f"Collection with ID {collection_id} not found: {collection}")
+        return None
+    
+    # Get post
+    def get_post(self, post_id):
+        post =  self.pins.find_one({"post_id" : post_id})
+        if post:
+            logging.info(f"Post with ID {post_id} found: {post}")
+            del post["_id"]
+            return post
+        logging.info(f"Post with ID {post_id} found: {post}")
+        return None
+    
+    import logging
+
+    # Get user collections
+    def get_user_collections(self, user_id):
+        collections = list(self.collections.find({"user_id": user_id}))
+        for collection in collections:
+            del collection["_id"]
+        logging.info(f"Found {len(collections)} collections for user {user_id}.")
+        return collections
+
+    # Get all user's posts
+    def get_user_posts(self, user_id):
+        posts = list(self.pins.find({"user_id": user_id}))
+        for post in posts:
+            del post["_id"]
+        logging.info(f"Found {len(posts)} posts for user {user_id}.")
+        return posts
+
+    # Get all posts saved by a user
+    def get_saved_posts_by_user(self, user_id):
+        user = self.users.find_one({"user_id": user_id})
+        if not user or "saved_posts" not in user:
+            logging.info(f"No saved posts found for user {user_id}.")
+            return []
+        posts = list(self.pins.find({"post_id": {"$in": user["saved_posts"]}}))
+        for post in posts:
+            del post["_id"]
+        logging.info(f"Found {len(posts)} saved posts for user {user_id}.")
+        return posts
+
+    # Get all posts liked by a user
+    def get_liked_posts_by_user(self, user_id):
+        user = self.users.find_one({"user_id": user_id})
+        if not user or "liked_posts" not in user:
+            logging.info(f"No liked posts found for user {user_id}.")
+            return []
+        posts = list(self.pins.find({"post_id": {"$in": user["liked_posts"]}}))
+        for post in posts:
+            del post["_id"]
+        logging.info(f"Found {len(posts)} liked posts for user {user_id}.")
+        return posts
+
+    # Get all posts saved by a user in a specific collection
+    def get_saved_posts_in_collection(self, user_id, collection_id):
+        collection = self.collections.find_one({
+            "collection_id": collection_id,
+            "user_id": user_id
+        })
+        if not collection or "post_ids" not in collection:
+            logging.info(f"No posts found in collection {collection_id} for user {user_id}.")
+            return []
+        post_ids = collection["post_ids"]
+        posts = list(self.pins.find({"post_id": {"$in": post_ids}}))
+        for post in posts:
+            del post["_id"]
+        logging.info(f"Found {len(posts)} posts in collection {collection_id} for user {user_id}.")
+        return posts
+
+    # Get date of post based on MongoDB _id timestamp
+    def get_post_date(self, post_id):
+        post = self.pins.find_one({"post_id": post_id})
+        if not post:
+            logging.info(f"Post with ID {post_id} not found.")
+            return None
+        timestamp = post["_id"].generation_time
+        formatted_date = timestamp.strftime("%B %d, %Y")
+        logging.info(f"Post {post_id} was created on {formatted_date}.")
+        return formatted_date
+
+
+    # Add a user
+    def add_user(self, user_data):
+        return self.users.insert_one(user_data)
 
     # Add a collection
     def add_collection(self, collection_data):
