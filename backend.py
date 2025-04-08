@@ -3,6 +3,8 @@ from pymongo.server_api import ServerApi
 import os
 from dotenv import load_dotenv, dotenv_values
 import logging
+from bson.objectid import ObjectId
+from datetime import datetime
 
 logging.basicConfig(level=logging.INFO)
 load_dotenv()
@@ -10,51 +12,6 @@ load_dotenv()
 USERNAME = os.getenv("USERNAME")
 PASSWORD = os.getenv("PASSWORD")
 URI = f"mongodb+srv://{USERNAME}:{PASSWORD}@cluster0.f8egr.mongodb.net/?appName=Cluster0"
-
-# TODO : func -> get collection || params -> collection_id || return -> collection data
-# TODO : func -> get post || params -> post_id || return -> post data
-# TODO : func -> get user collections || params -> user_id || return -> all collections of this user
-# TODO : func -> get user posts || params -> user_id || return -> all posts of this user
-# TODO : func -> get user saved posts || params -> user_id || return -> all saved posts of this user"
-# TODO : func -> get user liked posts || params -> user_id || return -> all liked posts of this user
-# TODO : func -> get user saved posts in collection || params -> user_id, collection_id || return -> all saved posts of this user in this collection
-# TODO : func -> get date of post || params -> post_id || return -> date of post [NOTE: this is not in the schema, but mongodb will add it automatically]
-#                 [so we can just get it from the post data and return it in a readable format - > December 12, 2023] ]
-
-USER_SCHEMA ={
-    "username": str,  # Username of the user
-    "user_id": str,  # Email address of the user
-    "user_pic": str,  # URL of the user's profile picture
-    "location": list, # location of the user
-    "location_geometry": list, # location of the user [longitude, latitude]
-    "created_pins": list,  # List of post IDs created by the user
-    "liked_posts": list,  # List of post IDs liked by the user
-    "saved_posts": list,  # List of post IDs saved by the user
-    "collections": list   # List of collection IDs created by the user
-}
-
-PIN_SCHEMA ={
-    "user_id": str,  # Username of the user who created the post
-    "post_id": str,  # Unique ID of the post
-    "location": list, # location of the user
-    "location_geometry": list, # location of the user [longitude, latitude]
-    "saved_by": list,  # List of user IDs who saved the post
-    "likes": list,  # List of user IDs who liked the post
-    "saved_in": list,  # List of collection IDs where the post is saved
-    "tags": list,  # List of tags associated with the post
-    "caption": str,  # Caption of the post
-    "images": list,  # List of media URLs associated with the post    
-}
-
-COLLECTION_SCHEMA ={
-    "user_id": str,  # Username of the user who created the collection
-    "collection_id": str,  # Unique ID of the collection
-    "collection_name": str,  # Name of the collection
-    "pin_ids": list  # List of post IDs saved in the collection
-}
-
-
-
 
 class Backend:
     def __init__(self):
@@ -69,6 +26,59 @@ class Backend:
         self.pins = self.db["Pin"]
         self.users = self.db["User"]
         self.collections = self.db["Collection"]
+
+    # Get collection
+    def get_collection(self, collection_id):
+        return self.collections.find_one({"collection_id" : collection_id})
+    
+    # Get post
+    def get_post(self, post_id):
+        return self.pins.find_one({"post_id" : post_id})
+    
+    # Get user collections
+    def get_user_collections(self, user_id):
+        return list(self.collections.find({"user_id" : user_id}))
+    
+    # Get all user's posts
+    def get_user_posts(self, user_id):
+        return list(self.pins.find({"user_id": user_id}))
+    
+    # Get all posts saved by a user
+    def get_saved_posts_by_user(self, user_id):
+        user = self.users.find_one({"user_id": user_id})
+        if not user or "saved_posts" not in user:
+            return []
+        return list(self.pins.find({"post_id": {"$in": user["saved_posts"]}}))
+    
+    # Get all posts liked by a user
+    def get_liked_posts_by_user(self, user_id):
+        user = self.users.find_one({"user_id": user_id})
+        if not user or "liked_posts" not in user:
+            return []
+        return list(self.pins.find({"post_id": {"$in": user["liked_posts"]}}))
+    
+    # Get all posts saved by a user in a specific collection
+    def get_saved_posts_in_collection(self, user_id, collection_id):
+        # Ensure collection belongs to the user
+        collection = self.collections.find_one({
+            "collection_id": collection_id,
+            "user_id": user_id
+        })
+        if not collection or "post_ids" not in collection:
+            return []
+        
+        post_ids = collection["post_ids"]
+        return list(self.pins.find({"post_id": {"$in": post_ids}}))
+    
+    # Get date of post based on MongoDB _id timestamp
+    def get_post_date(self, post_id):
+        post = self.pins.find_one({"post_id": post_id})
+        if not post:
+            return None
+        # MongoDB _id contains timestamp
+        timestamp = post["_id"].generation_time
+        # Format to: December 12, 2023
+        return timestamp.strftime("%B %d, %Y")
 
     # Add a user
     def add_user(self, user_data):
