@@ -2,12 +2,59 @@ from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 import os
 from dotenv import load_dotenv, dotenv_values
+import logging
 
+logging.basicConfig(level=logging.INFO)
 load_dotenv()
 
 USERNAME = os.getenv("USERNAME")
 PASSWORD = os.getenv("PASSWORD")
 URI = f"mongodb+srv://{USERNAME}:{PASSWORD}@cluster0.f8egr.mongodb.net/?appName=Cluster0"
+
+# TODO : func -> get collection || params -> collection_id || return -> collection data
+# TODO : func -> get post || params -> post_id || return -> post data
+# TODO : func -> get user collections || params -> user_id || return -> all collections of this user
+# TODO : func -> get user posts || params -> user_id || return -> all posts of this user
+# TODO : func -> get user saved posts || params -> user_id || return -> all saved posts of this user"
+# TODO : func -> get user liked posts || params -> user_id || return -> all liked posts of this user
+# TODO : func -> get user saved posts in collection || params -> user_id, collection_id || return -> all saved posts of this user in this collection
+# TODO : func -> get date of post || params -> post_id || return -> date of post [NOTE: this is not in the schema, but mongodb will add it automatically]
+#                 [so we can just get it from the post data and return it in a readable format - > December 12, 2023] ]
+
+USER_SCHEMA ={
+    "username": str,  # Username of the user
+    "user_id": str,  # Email address of the user
+    "user_pic": str,  # URL of the user's profile picture
+    "location": list, # location of the user
+    "location_geometry": list, # location of the user [longitude, latitude]
+    "created_pins": list,  # List of post IDs created by the user
+    "liked_posts": list,  # List of post IDs liked by the user
+    "saved_posts": list,  # List of post IDs saved by the user
+    "collections": list   # List of collection IDs created by the user
+}
+
+PIN_SCHEMA ={
+    "user_id": str,  # Username of the user who created the post
+    "post_id": str,  # Unique ID of the post
+    "location": list, # location of the user
+    "location_geometry": list, # location of the user [longitude, latitude]
+    "saved_by": list,  # List of user IDs who saved the post
+    "likes": list,  # List of user IDs who liked the post
+    "saved_in": list,  # List of collection IDs where the post is saved
+    "tags": list,  # List of tags associated with the post
+    "caption": str,  # Caption of the post
+    "images": list,  # List of media URLs associated with the post    
+}
+
+COLLECTION_SCHEMA ={
+    "user_id": str,  # Username of the user who created the collection
+    "collection_id": str,  # Unique ID of the collection
+    "collection_name": str,  # Name of the collection
+    "pin_ids": list  # List of post IDs saved in the collection
+}
+
+
+
 
 class Backend:
     def __init__(self):
@@ -26,6 +73,17 @@ class Backend:
     # Add a user
     def add_user(self, user_data):
         return self.users.insert_one(user_data)
+    
+    # Get a user
+    def get_user(self, user_id):
+        user = self.users.find_one({"user_id": user_id})
+        if user:
+            # Remove the _id field from the user data
+            logging.info(f"User with ID {user_id} found: {user}")
+            del user["_id"]
+            return user
+        logging.info(f"User with ID {user_id} not found.")
+        return None
 
     # Add a collection
     def add_collection(self, collection_data):
